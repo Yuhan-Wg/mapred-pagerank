@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="mapred-pagerank">
+    <output-path>$PROJECT_DIR$/out/artifacts/mapred_pagerank</output-path>
+    <root id="archive" name="mapred-pagerank.jar">
+      <element id="module-output" name="mapred-pagerank" />
+    </root>
+  </artifact>
+</component>
