@@ -1,12 +1,12 @@
 ## Implementation of PageRank Algorithm in JAVA/Mapreduce
 
-<img src="interface/img/figure_1.png" width = "300" height = "300" align=left />
+<img src="visualization/img/figure_1.png" width = "320" height = 320" align=left />
 
 #### Dependencies
 
 JAVA 8, hadoop mapreduce
 
-Visualization: 
+Visualization:
 
 Python3, matplotlib.pyplot, networkx
 
@@ -28,7 +28,7 @@ The input file contains edges, like:
 4 \t 1
 ...
 ```
-The nodes are presented in integer. If you have a file with string nodes, you can index them with [this](src/main/format/ProduceTransitionMatrix.java).
+The nodes are presented in integer. If you have a file with string nodes, you can index them.( You can try [this](src/main/java/format/ProduceTransitionMatrix.java) class)
 
 #### MapReduce Tasks Pipeline
 **Driver.class**: The main function to run all tasks.
@@ -81,7 +81,7 @@ $ python3 interface/visualization.py output/pagerank input/small_input/cites.txt
 ```
 
 The visualization result is like:
-![](interface/img/figure_1.png)
+![](visualization/img/figure_1.png)
 
 #### Other applications in this project (not used in the main function).
 * **format.ConstructStringIntegerMap**: Build a <String, int> map, each string refers to a unique integer.

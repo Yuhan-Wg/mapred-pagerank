@@ -10,11 +10,15 @@ import java.util.*;
  * Created by wangyuhan on 6/18/19.
  */
 // This class is built on singel machine
-public class ProduceTrasitionMatrix {
+public class ProduceTransitionMatrix {
     private static Map<String, Integer> hashMap;
     private static Map<Integer, List<Integer>> directionMap;
     private static Set<Integer> hashSet;
     private static int nextCode;
+
+    public static void main(String[] args) throws Exception{
+        produceMatrixFromString(args);
+    }
 
     public static void produceMatrixFromString(String[] args) throws Exception{
         String inputFile = args[0];
