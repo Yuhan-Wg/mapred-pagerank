@@ -1,67 +1,121 @@
+package pagerank;
+
 import java.io.File;
+import utils.FuncTools;
+import utils.HadoopParams;
 /**
  * Created by wangyuhan on 6/17/19.
  */
 public class Driver {
     public static void main(String [] args) throws Exception{
-        //args0: dir of transition.txt
-        //args1: dir of initPageRank.txt
-        //args2: dir of middleResults
-        //args3: dir of finalResults
-        //args4: times of convergence
+        // args:
+        //     0: inputFilePath,
+        //     1: middleResultsPath,
+        //     2: finalResultsPath,
+        //     3: convergence,
+        //     4: beta
+        DriverInitializer initializer = new DriverInitializer(args);
 
+        // Initialize input files
+        String[] args0 = {
+                initializer.inputFile,
+                initializer.initPageRankPath,
+                initializer.inputFile
+        };
+        ProduceInitPageRankOnHDFS.main(args0);
+        //ProduceTransitionMatrixOnHDFS.main(args0);
+
+        // Compute PageRanks
         PageRankTransition transitionMultiplication = new PageRankTransition();
         PageRankSum prSum = new PageRankSum();
-
-        String transitionMatrixPath = args[0];
-        String initPageRankStatePath = args[1];
-        String middleResultsPath = args[2];
-        String finalResultsPath = args[3];
-        int convergence = Integer.parseInt(args[4]);
-
-
-        for(int i=0;  i<convergence;  i++) {
-            String pageRankPath;
-            if(i==0){
-                pageRankPath = initPageRankStatePath;
-            }else {
-                pageRankPath = middleResultsPath + "/output"+i;
-            }
-
-            String middleStatePath = middleResultsPath + "/buffer"+i;
-            String nextPageRankPath = middleResultsPath + "/output"+(i+1);
+        for(int i=1;  i<=initializer.convergence;  i++) {
+            initializer.update(i);
 
             // MapReduce Task 1
-            String[] args1 = {transitionMatrixPath, pageRankPath, middleStatePath};
-            deleteFiles(new File(middleStatePath));
+            String[] args1 = {
+                    initializer.inputFile,
+                    initializer.prevPageRankPath,
+                    initializer.middleStatePath
+            };
             transitionMultiplication.main(args1);
 
             // MapReduce Task 2
-            String[] args2 = {middleStatePath, nextPageRankPath};
-            deleteFiles(new File(nextPageRankPath));
+            String[] args2;
+            if(i==initializer.convergence){
+                args2 = new String[]{
+                        initializer.middleStatePath,
+                        initializer.prevPageRankPath,
+                        initializer.nextPageRankPath,
+                        initializer.beta
+                };
+            }else{
+                args2 =  new String[]{
+                        initializer.middleStatePath,
+                        initializer.initPageRankPath,
+                        initializer.nextPageRankPath,
+                        initializer.beta
+                };
+            }
             prSum.main(args2);
 
+            // Delete middle results except initial pageRankFile
+            if (i > 1){
+                FuncTools.deleteFiles(new File(initializer.prevPageRankPath));
+            }
+            FuncTools.deleteFiles(new File(initializer.middleStatePath));
         }
-        String pageRankPath = middleResultsPath + "/output"+convergence;
-        String[] args3 = {transitionMatrixPath, pageRankPath, finalResultsPath};
-        deleteFiles(new File(finalResultsPath + "/result.csv"));
-        TransferToCSV.main(args3);
+        String[] args3 = {
+                initializer.inputFile,
+                initializer.finalPageRankPath,
+                initializer.finalResultsFile
+        };
+        FuncTools.transToCSV(args3);
     }
 
-    public static void deleteFiles(File file){
-        if(!file.exists()) return;
+}
 
-        if(file.isFile() || file.list()==null){
-            file.delete();
-            return;
-        }else{
-            File[] files = file.listFiles();
-            for(File f:files){
-                deleteFiles(f);
-            }
-            file.delete();
-            return;
-        }
+class DriverInitializer{
+    // Directories
+    public String inputFile;
+    public String transitionMatrixPath;
+    public String initPageRankPath;
+    public String finalPageRankPath;
+    public String finalResultsFile;
+    // Parameters
+    public int convergence;
+    public String beta;
+    // Middle Parameters
+    public String middleResultsPath;
+    public String prevPageRankPath;
+    public String middleStatePath;
+    public String nextPageRankPath;
 
+
+    public DriverInitializer(String[] args){
+        inputFile = args[0];
+        middleResultsPath = args[1];
+        finalResultsFile = args[2] +"/" +HadoopParams.resultFileName;
+        convergence = Integer.parseInt(args[3]);
+        beta = args[4].trim();
+
+        transitionMatrixPath = middleResultsPath + "/" + HadoopParams.transitionMatrixDirName;
+        initPageRankPath = middleResultsPath + "/"+ HadoopParams.pageRankOutputDirName+0;
+        finalPageRankPath = middleResultsPath + "/"+ HadoopParams.pageRankOutputDirName+convergence;
+
+        emptyFiles();
+    }
+
+    private void emptyFiles(){
+        // Prepare output directories
+        // Empty middle result from last the mapred task
+        FuncTools.deleteFiles(new File(middleResultsPath));
+        FuncTools.deleteFiles(new File(finalResultsFile));
+        new File(middleResultsPath).mkdir();
+    }
+
+    public void update(int i){
+        prevPageRankPath= middleResultsPath + "/"+HadoopParams.pageRankOutputDirName+(i-1);
+        middleStatePath = middleResultsPath + "/" + HadoopParams.bufferOutputDirName+i;
+        nextPageRankPath = middleResultsPath + "/" + HadoopParams.pageRankOutputDirName+i;
     }
 }
