@@ -1,6 +1,8 @@
-package pagerank;
-
 import java.io.File;
+
+import pagerank.PageRankSum;
+import pagerank.PageRankTransition;
+import pagerank.ProduceInitPageRankOnHDFS;
 import utils.FuncTools;
 import utils.HadoopParams;
 /**
@@ -22,24 +24,53 @@ public class Driver {
                 initializer.initPageRankPath,
                 initializer.inputFile
         };
+        // Initialize pagerank scores with constant(=1.0)
         ProduceInitPageRankOnHDFS.main(args0);
-        //ProduceTransitionMatrixOnHDFS.main(args0);
 
-        // Compute PageRanks
-        PageRankTransition transitionMultiplication = new PageRankTransition();
-        PageRankSum prSum = new PageRankSum();
+        /* Compute PageRanks
+        Loop for "convergence" times:
+            for each loop, multiply transition matrix and pagerank
+         */
+        PageRankTransition pageRankTransition = new PageRankTransition();
+        PageRankSum pageRankSum = new PageRankSum();
         for(int i=1;  i<=initializer.convergence;  i++) {
             initializer.update(i);
 
-            // MapReduce Task 1
+            /* MapReduce Task 1
+            Arguments:
+                inputFile:
+                    The raw input file, each line is like "fromNode \t toNode" (no whitespace).
+                    It will be used as transition matrix: fromNode is column index, toNode is row index.
+                prevPageRankPath:
+                    Path of the previous pagerank scores, each line is like "node \t pagerankScore"(no whitespace).
+                    It will be used as vector: node is row index.
+                middleStatePath:
+                    Path to save middle output, including pagerank output in each loop.
+
+            pageRankTransition: Multiply each matrix unit with corresponding vector unit.
+             */
             String[] args1 = {
                     initializer.inputFile,
                     initializer.prevPageRankPath,
                     initializer.middleStatePath
             };
-            transitionMultiplication.main(args1);
+            pageRankTransition.main(args1);
 
-            // MapReduce Task 2
+            /* MapReduce Task 2
+            Arguments:
+                middleStatePath: Path of middle output.
+                prevPageRankPath: Path of pagerank scores from last loop.
+                initPageRankPath: Path of initial pagerank scores.
+                nextPageRankPath: Path to store pagerank socres in thie loop.
+                beta: Parameter to control teleport.
+
+            pageRankSum: Sum up multiplication results from last MapReduce task and add teleport.
+
+            Note: You can choose the teleport type:
+                Option A: PR(N) = (1-beta)* TM * PR(N-1) + beta * PR(N-1)
+                Option B: PR(N) = (1-beta)* TM * PR(N-1) + beta * PR(0)
+                (TM: Transition Matrix; PR(N): PageRank score in Nth loop)
+             */
             String[] args2;
             if(i==initializer.convergence){
                 args2 = new String[]{
@@ -56,20 +87,26 @@ public class Driver {
                         initializer.beta
                 };
             }
-            prSum.main(args2);
+            pageRankSum.main(args2);
 
             // Delete middle results except initial pageRankFile
-            if (i > 1){
-                FuncTools.deleteFiles(new File(initializer.prevPageRankPath));
-            }
-            FuncTools.deleteFiles(new File(initializer.middleStatePath));
+            // (For easy debug in IntelliJ IDEA)
+            //if (i > 1){
+            //    FuncTools.deleteFiles(new File(initializer.prevPageRankPath));
+            //}
+            //FuncTools.deleteFiles(new File(initializer.middleStatePath));
         }
+
+        /*
+        Transfer pagerank output to .CSV file for visualization. (Not yet)
+
         String[] args3 = {
                 initializer.inputFile,
                 initializer.finalPageRankPath,
                 initializer.finalResultsFile
         };
         FuncTools.transToCSV(args3);
+        */
     }
 
 }
@@ -102,7 +139,7 @@ class DriverInitializer{
         initPageRankPath = middleResultsPath + "/"+ HadoopParams.pageRankOutputDirName+0;
         finalPageRankPath = middleResultsPath + "/"+ HadoopParams.pageRankOutputDirName+convergence;
 
-        emptyFiles();
+        // emptyFiles();
     }
 
     private void emptyFiles(){

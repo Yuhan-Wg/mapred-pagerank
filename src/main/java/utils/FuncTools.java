@@ -1,5 +1,4 @@
-package HadoopUtils;
-
+package utils;
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -9,12 +8,11 @@ import java.io.File;
  */
 public class FuncTools {
     public static void transToCSV(String[] args) throws IOException{
-        BufferedReader transition = new BufferedReader(new FileReader(args[0] + "/part-r-00000"));
         BufferedReader pr = new BufferedReader(new FileReader(args[1] + "/part-r-00000"));
         FileWriter fileWriter = new FileWriter(args[2]);
 
+        // PageRank Scores
         Map<String, String> page_pr = new HashMap<String, String>();
-
         String line = pr.readLine();
         while (line != null) {
             page_pr.put(
@@ -24,22 +22,34 @@ public class FuncTools {
         }
         pr.close();
 
-        line = transition.readLine();
         fileWriter.write("source,target,value\n");
 
-        while (line != null) {
-
-            String[] from_tos = line.split(HadoopParams.SPARATOR);
-            String[] tos = from_tos[1].split(HadoopParams.subSPARATOR);
-            for (String to: tos) {
-                String value = page_pr.get(to);
-                fileWriter.write(from_tos[0] + "," + to + "," + value + "\n");
-            }
+        for(File file: new File(args[0]).listFiles()){
+            if(file.toString().contains(".DS_Store")) continue;
+            BufferedReader transition = new BufferedReader(new FileReader(file));
             line = transition.readLine();
-        }
 
-        transition.close();
+            while (line != null) {
+                String[] from_tos = line.split(HadoopParams.SPARATOR);
+                if(line.startsWith(HadoopParams.skipSign)
+                        ||from_tos.length<2
+                        ||from_tos[1].equals("")){
+                    line = transition.readLine();
+                    continue;
+                }
+                String value = page_pr.get(from_tos[1]);
+                fileWriter.write(from_tos[0]
+                        + HadoopParams.subSPARATOR
+                        + from_tos[1]
+                        + HadoopParams.subSPARATOR
+                        + value + "\n");
+                line = transition.readLine();
+            }
+
+            transition.close();
+        }
         fileWriter.close();
+
     }
 
     public static void deleteFiles(File file){

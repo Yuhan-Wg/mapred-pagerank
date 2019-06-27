@@ -1,4 +1,6 @@
-import com.google.protobuf.TextFormat;
+package pagerank;
+
+import utils.HadoopParams;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
@@ -11,9 +13,7 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
 
 /**
  * Created by wangyuhan on 6/24/19.
@@ -23,10 +23,13 @@ public class ProduceTransitionMatrixOnHDFS {
     public static class TransitionMatrixMapper extends Mapper<Object, Text, IntWritable, IntWritable>{
         @Override
         public void map(Object key, Text value, Context context) throws IOException,InterruptedException{
-            String[] fromTo = value.toString().trim().split("\t");
-            if(value.toString().trim().startsWith("#") || fromTo.length<2 || fromTo[1].trim().equals("")) return;
+            String[] fromTo = value.toString().trim().split(HadoopParams.SPARATOR);
+            if(value.toString().trim().startsWith(HadoopParams.skipSign) || fromTo.length<2 || fromTo[1].trim().equals("")) return;
             try {
-                context.write(new IntWritable(Integer.parseInt(fromTo[0])), new IntWritable(Integer.parseInt(fromTo[1])));
+                context.write(
+                        new IntWritable(Integer.parseInt(fromTo[0])),
+                        new IntWritable(Integer.parseInt(fromTo[1]))
+                );
             }catch (NumberFormatException e){
                 return;//Skip this line
             }
@@ -36,11 +39,11 @@ public class ProduceTransitionMatrixOnHDFS {
 
     public static class TransitionMatrixReducer extends Reducer<IntWritable, IntWritable, IntWritable, Text>{
         @Override
-        public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException,InterruptedException{
+        public void reduce(IntWritable key, Iterable<IntWritable> values, Context context)
+                throws IOException,InterruptedException{
             StringBuilder sb = new StringBuilder();
             for(IntWritable v:values){
-                String value = v.toString();
-                sb.append(v+",");
+                sb.append(v.toString()+HadoopParams.subSPARATOR);
             }
             context.write(key, new Text(sb.toString().substring(0, sb.toString().length()-1)));
         }

@@ -1,4 +1,4 @@
-package pagerank;
+package format;
 
 import utils.HadoopParams;
 
@@ -12,7 +12,7 @@ import java.util.*;
 // This class is built on singel machine
 public class ProduceTrasitionMatrix {
     private static Map<String, Integer> hashMap;
-    private static Map<Integer, List> directionMap;
+    private static Map<Integer, List<Integer>> directionMap;
     private static Set<Integer> hashSet;
     private static int nextCode;
 
@@ -24,7 +24,7 @@ public class ProduceTrasitionMatrix {
 
         BufferedReader inputBR = new BufferedReader(new FileReader(inputFile));
         hashMap = new HashMap<String, Integer>();
-        directionMap = new HashMap<Integer, List>();
+        directionMap = new HashMap<Integer, List<Integer>>();
 
         nextCode = 0;
         String line = inputBR.readLine();
@@ -56,7 +56,7 @@ public class ProduceTrasitionMatrix {
         BufferedReader inputBR = new BufferedReader(new FileReader(inputFile));
 
         hashSet = new HashSet<Integer>();
-        directionMap = new HashMap<Integer, List>();
+        directionMap = new HashMap<Integer, List<Integer>>();
 
         String line = inputBR.readLine();
         while(line != null){
@@ -79,7 +79,7 @@ public class ProduceTrasitionMatrix {
     }
 
     private static void writeToFile(Iterator<Integer> iter,int iterSize, String outputFilePath,
-                                    Map<Integer, List> directionMap, String transitionMatrixPath) throws IOException{
+                                    Map<Integer, List<Integer>> directionMap, String transitionMatrixPath) throws IOException{
 
         if(!new File(outputFilePath).exists()){
             new File(outputFilePath).mkdir();
@@ -94,19 +94,17 @@ public class ProduceTrasitionMatrix {
         // Write pagerank to file
         while(iter.hasNext()){
             int val = iter.next();
-            DecimalFormat df = new DecimalFormat("#.00000000");
-            pageRank.write(val + "\t" + df.format(1./iterSize) + "\n");
+            pageRank.write(val + HadoopParams.SPARATOR
+                    + HadoopParams.decimalFormat.format(HadoopParams.initialPageRank) + "\n");
         }
         pageRank.close();
 
         // Write transitionMatrix to file
         for(int key:directionMap.keySet()){
-            String writer = key+"\t";
             List<Integer> values = directionMap.get(key);
             for(int val:values){
-                writer += val + ",";
+                transitionMatrix.write(key + HadoopParams.SPARATOR + val + "\n");
             }
-            transitionMatrix.write(writer.substring(0, writer.length()-1) + "\n");
         }
         transitionMatrix.close();
     }

@@ -1,3 +1,13 @@
-interface
-output/middle_result
+visualization/*
+!visualization/img
+!visualization/visualization.py
 
+output/*
+!output/pagerank
+
+input/*
+!input/small_input
+
+
+.DS_Store
+_SUCCESS

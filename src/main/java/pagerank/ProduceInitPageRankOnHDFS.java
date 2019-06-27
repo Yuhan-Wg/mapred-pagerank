@@ -1,3 +1,8 @@
+package pagerank;
+
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.NullWritable;
+import utils.HadoopParams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
@@ -16,24 +21,42 @@ import java.io.IOException;
  * Created by wangyuhan on 6/24/19.
  */
 public class ProduceInitPageRankOnHDFS {
-    public static class PageRankVecMapper extends Mapper<Object, Text, IntWritable, IntWritable> {
+    /*
+    This Mapper is to output all node
+        Output: (Node, null)
+     */
+    public static class PageRankVecMapper extends Mapper<Object, Text, IntWritable, NullWritable> {
         @Override
         public void map(Object key, Text value, Context context) throws IOException,InterruptedException{
-            String[] fromTo = value.toString().trim().split("\t");
-            if(value.toString().trim().startsWith("#") || fromTo.length<2 || fromTo[1].trim().equals("")) return;
+            String[] fromTo = value.toString().trim().split(HadoopParams.SPARATOR);
+            if(value.toString().trim().startsWith(HadoopParams.skipSign) || fromTo.length<2 || fromTo[1].trim().equals("")) return;
             try {
-                context.write(new IntWritable(Integer.parseInt(fromTo[0])),new IntWritable(1));
-                context.write(new IntWritable(Integer.parseInt(fromTo[1])),new IntWritable(1));
+                context.write(new IntWritable(Integer.parseInt(fromTo[0])),NullWritable.get());
+                context.write(new IntWritable(Integer.parseInt(fromTo[1])),NullWritable.get());
             }catch (NumberFormatException e){
                 return;//Skip this line
             }
         }
     }
 
-    public static class PageRankVecReducer extends Reducer<IntWritable, IntWritable, IntWritable, IntWritable> {
+    /*
+    This Combiner is to remove duplicates
+     */
+    public static class PageRankVecCombiner extends Reducer<IntWritable, NullWritable, IntWritable, NullWritable> {
         @Override
-        public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException{
-            context.write(key, new IntWritable(1));
+        public void reduce(IntWritable key, Iterable<NullWritable> values, Context context) throws IOException, InterruptedException{
+            context.write(key, NullWritable.get());
+        }
+    }
+
+    /*
+    This Reducer is to remove duplicates and output initial pagerank for each unique node.
+        Output: (Node, inital pagerank)
+     */
+    public static class PageRankVecReducer extends Reducer<IntWritable, NullWritable, IntWritable, FloatWritable> {
+        @Override
+        public void reduce(IntWritable key, Iterable<NullWritable> values, Context context) throws IOException, InterruptedException{
+            context.write(key, new FloatWritable(HadoopParams.initialPageRank));
         }
     }
     public static void main(String[] args) throws Exception{
@@ -46,10 +69,13 @@ public class ProduceInitPageRankOnHDFS {
         job.setJarByClass(ProduceInitPageRankOnHDFS.class);
 
         job.setMapperClass(PageRankVecMapper.class);
+        job.setCombinerClass(PageRankVecCombiner.class);
         job.setReducerClass(PageRankVecReducer.class);
 
+        job.setMapOutputKeyClass(IntWritable.class);
+        job.setMapOutputValueClass(NullWritable.class);
         job.setOutputKeyClass(IntWritable.class);
-        job.setOutputValueClass(IntWritable.class);
+        job.setOutputValueClass(FloatWritable.class);
 
         job.setInputFormatClass(TextInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);

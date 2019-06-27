@@ -1,3 +1,6 @@
+package pagerank;
+
+import utils.HadoopParams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.*;
@@ -18,36 +21,55 @@ import java.util.List;
  * Created by wangyuhan on 6/17/19.
  */
 public class PageRankTransition {
+    /*
+    This Mapper is to output (fromNode, toNode), all in integers.
+    Or in the language of linear algebra, it is to output (column index, row index) of the matrix.
+     */
     public static class TransitionMatrixMapper extends Mapper<Object, Text, IntWritable, IntFloatWritable>{
         @Override
         public void map(Object key, Text value, Context context) throws IOException,InterruptedException{
-            // fromTo: ["pageID", "pageID,pageID"]
-            String[] fromTo = value.toString().trim().split("\t");
-
-            if(fromTo.length<2 || fromTo[1].trim().equals("")) {
-                return;
-            }
+            String[] fromTo = value.toString().trim().split(HadoopParams.SPARATOR);
+            if(value.toString().trim().startsWith(HadoopParams.skipSign)
+                    ||fromTo.length<2
+                    || fromTo[1].trim().equals("")) {return;}
 
             String source = fromTo[0];
-            String[] targets = fromTo[1].split(",");
-            for(String t: targets){
-                context.write(new IntWritable(Integer.parseInt(source)),
-                        new IntFloatWritable(Integer.parseInt(t),false));
-            }
+            String target = fromTo[1];
+            context.write(
+                    new IntWritable(Integer.parseInt(source)),
+                    new IntFloatWritable(Integer.parseInt(target),false)
+            );
+
         }
     }
 
+    /*
+    This Mapper is to output (fromNode, pageRank), all in integers.
+    In the language of linear algebra, it is to output (row index of the vector, pageRank).
+
+    This is a trick on output value: Since the float and int both use 4Bytes, it is possible to transfer float to int
+    with same bits. Then the output of two mapper can have same output value format.
+     */
     public static class PageRankStateMapper extends Mapper<Object, Text, IntWritable, IntFloatWritable>{
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException{
-            String[] sourceState = value.toString().trim().split("\t");
-            context.write(new IntWritable(Integer.parseInt(sourceState[0])),
-                    new IntFloatWritable(Float.floatToIntBits(Float.parseFloat(sourceState[1])), true));//parse pagerank to integer
+            String[] sourceState = value.toString().trim().split(HadoopParams.SPARATOR);
+            context.write(
+                    new IntWritable(Integer.parseInt(sourceState[0])),
+                    new IntFloatWritable(Float.floatToIntBits(Float.parseFloat(sourceState[1])), true)
+            );//parse pagerank to integer
         }
     }
 
-    public static class MultiplicationReducer extends Reducer<IntWritable, IntFloatWritable, IntWritable, FloatWritable>{
+    /*
+    This Reducer is to multiply matrix units with corresponding vector units.
+    In the language of linear algebra, it is to compute:
+        i_th column vector in the transition matrix * i_th unit in the pageRank vector.
+    And then output (Row Index, result)
 
+    This is to distribute the PageRank from source pages to target pages.
+     */
+    public static class MultiplicationReducer extends Reducer<IntWritable, IntFloatWritable, IntWritable, FloatWritable>{
         @Override
         public void reduce(IntWritable key, Iterable<IntFloatWritable> values, Context context) throws IOException, InterruptedException{
             // values: [PageRankState, TransitionMatrixComponents]
@@ -81,8 +103,14 @@ public class PageRankTransition {
         Job job = Job.getInstance(conf);
         job.setJarByClass(PageRankTransition.class);
 
-        ChainMapper.addMapper(job, TransitionMatrixMapper.class, Object.class, Text.class, IntWritable.class, IntFloatWritable.class, conf);
-        ChainMapper.addMapper(job, PageRankStateMapper.class, IntWritable.class, IntFloatWritable.class, IntWritable.class, IntFloatWritable.class, conf);
+        ChainMapper.addMapper(
+                job, TransitionMatrixMapper.class,
+                Object.class, Text.class, IntWritable.class, IntFloatWritable.class,
+                conf);
+        ChainMapper.addMapper(
+                job, PageRankStateMapper.class,
+                IntWritable.class, IntFloatWritable.class, IntWritable.class, IntFloatWritable.class,
+                conf);
 
         job.setReducerClass(MultiplicationReducer.class);
         job.setOutputKeyClass(IntWritable.class);
@@ -97,6 +125,8 @@ public class PageRankTransition {
 }
 
 class IntFloatWritable implements Writable{
+    // val: the pageRank (if state is true)
+    //      the index of Node (if state is false)
     private IntWritable val;
     private BooleanWritable state;
 

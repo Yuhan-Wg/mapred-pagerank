@@ -1,6 +1,8 @@
+package pagerank;
+
+import utils.HadoopParams;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
@@ -13,48 +15,62 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 import java.io.IOException;
-import java.text.DecimalFormat;
+
 /**
  * Created by wangyuhan on 6/17/19.
  */
 public class PageRankSum {
+    /*
+    This Mapper is to interpret the results from last mapreduce task:
+        Output: (Node, pageRank)
+    Then multiply (1-beta) for teleport.
+     */
     public static class PageRankMapper extends Mapper<Object, Text, IntWritable, FloatWritable>{
         public float beta;
-
         @Override
         public void setup(Context context){
             Configuration conf = new Configuration();
             beta = conf.getFloat("beta", 0.2f);
         }
-
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException{
-            String[] pageRank = value.toString().trim().split("\t");
+            String[] pageRank = value.toString().trim().split(HadoopParams.SPARATOR);
             String page = pageRank[0];
             float rank = Float.parseFloat(pageRank[1].trim()) * (1-beta);
-            context.write(new IntWritable(Integer.parseInt(page)), new FloatWritable(rank));
+            context.write(
+                    new IntWritable(Integer.parseInt(page)),
+                    new FloatWritable(rank)
+            );
         }
     }
-
+    /*
+    This Mapper is collect the initial/previous pagerank:
+        Output: (Node, pageRank)
+    Then multiply beta for teleport.
+     */
     public static class CompensatoryMapper extends Mapper<Object, Text, IntWritable, FloatWritable>{
         public float beta;
-
         @Override
         public void setup(Context context){
             Configuration conf = new Configuration();
             beta = conf.getFloat("beta", 0.2f);
         }
-
-
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException{
-            String[] pageRank = value.toString().trim().split("\t");
+            String[] pageRank = value.toString().trim().split(HadoopParams.SPARATOR);
             String page = pageRank[0];
             float rank = Float.parseFloat(pageRank[1].trim()) * beta;
-            context.write(new IntWritable(Integer.parseInt(page)), new FloatWritable(rank));
+            context.write(
+                    new IntWritable(Integer.parseInt(page)),
+                    new FloatWritable(rank)
+            );
         }
     }
 
+    /*
+    This Reducer is to collect all middle-state pagerank and sum up for final pagerank results(in this loop).
+        Output: (Node, final pageRank)
+     */
     public static class PageRankReducer extends Reducer<IntWritable, FloatWritable, IntWritable, FloatWritable>{
         @Override
         public void reduce(IntWritable key, Iterable<FloatWritable> values, Context context) throws IOException, InterruptedException{
@@ -62,25 +78,25 @@ public class PageRankSum {
             for(FloatWritable value:values){
                 sum += value.get();
             }
-            DecimalFormat df = new DecimalFormat("#.0000000");
-            sum = Float.valueOf(df.format(sum));
+            sum = Float.valueOf(HadoopParams.decimalFormat.format(sum));
             context.write(key, new FloatWritable(sum));
         }
     }
 
     public static void main(String[] args) throws Exception{
-        // args0: dir of input pr values from last step
-        // args1: dir of input pr values from last mapred task
-        // args2: dir of output pr values
-        // args3: beta
-
         Configuration conf = new Configuration();
         conf.setDouble("beta", Float.parseFloat(args[3]));
         Job job = Job.getInstance(conf);
         job.setJarByClass(PageRankSum.class);
 
-        ChainMapper.addMapper(job, PageRankMapper.class, Object.class, Text.class, IntWritable.class, FloatWritable.class, conf);
-        ChainMapper.addMapper(job, CompensatoryMapper.class, IntWritable.class, FloatWritable.class, IntWritable.class, FloatWritable.class, conf);
+        ChainMapper.addMapper(
+                job, PageRankMapper.class,
+                Object.class, Text.class, IntWritable.class, FloatWritable.class,
+                conf);
+        ChainMapper.addMapper(
+                job, CompensatoryMapper.class,
+                IntWritable.class, FloatWritable.class, IntWritable.class, FloatWritable.class,
+                conf);
         job.setReducerClass(PageRankReducer.class);
 
         job.setOutputKeyClass(IntWritable.class);
