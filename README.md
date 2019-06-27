@@ -1,8 +1,10 @@
-## Implementation of PageRank Algorithm in JAVA/Mapreduce
+## Implementation of PageRank Algorithm in JAVA & Mapreduce
 
-<img src="visualization/img/figure_1.png" width = "320" height = 320" align=left />
-
-#### Dependencies
+<div align=left><img src="visualization/img/figure_1.png" width = "400" height = 400"/></div>
+ 
+***
+ 
+### Dependencies
 
 JAVA 8, hadoop mapreduce
 
@@ -10,7 +12,9 @@ Visualization:
 
 Python3, matplotlib.pyplot, networkx
 
-#### Dataset
+***
+
+### Dataset
 
 If you want to prefer a small dataset:
 
@@ -30,7 +34,9 @@ The input file contains edges, like:
 ```
 The nodes are presented in integer. If you have a file with string nodes, you can index them.( You can try [this](src/main/java/format/ProduceTransitionMatrix.java) class)
 
-#### MapReduce Tasks Pipeline
+***
+
+### MapReduce Tasks Pipeline
 **Driver.class**: The main function to run all tasks.
 
 * MapReduce Task1-ProducePageRankOnHDFS: Find unique nodes and initialize PageRank scores with 1.0
@@ -49,7 +55,9 @@ The nodes are presented in integer. If you have a file with string nodes, you ca
 
 utils.HadoopParams is where we can set parameters in the tasks.
 
-#### Run the code
+***
+
+### Run the code in Terminal
 
 In IntelliJ IDEA, run the Driver and input parameters:
 
@@ -83,7 +91,9 @@ $ python3 interface/visualization.py output/pagerank input/small_input/cites.txt
 The visualization result is like:
 ![](visualization/img/figure_1.png)
 
-#### Other applications in this project (not used in the main function).
+***
+
+### Other applications in this project (not used in the main function).
 * **format.ConstructStringIntegerMap**: Build a <String, int> map, each string refers to a unique integer.
 
 * **format.ProduceTransitionMatrix**: Build initial pageRank scores and transition matrix on single machine.
@@ -94,8 +104,8 @@ The visualization result is like:
   * transToCSV: Transfer results of mapreduce tasks to .csv file.
   * deleteFiles: Delete files.
 
-#### Coding Enviroment
+***
 
-Local Machine: MacOS10.13.6
+### Coding Enviroment
 
-IDE: IntelliJ IDEA
+IntelliJ IDEA on  MacOS 10.13.6
